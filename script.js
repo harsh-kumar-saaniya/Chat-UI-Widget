@@ -17,8 +17,10 @@
     webhookUrl: ds('webhook', '').trim(), // REQUIRED ideally
     assistantName: ds('assistant-name', 'Chat'),
     assistantAvatar: ds('assistant-avatar', '').trim(),
-    footerText: ds('footer-text', '').trim(),
+    footerText: ds('footer-text', '').trim(), // custom text from client
+    footerTextColor: ds('footer-text-color', 'inherit'), // optional color
     enableTyping: ds('enable-typing', 'true') !== 'false',
+    branding: thisScript.getAttribute('branding'), // true/false
 
     // theme colors - optional
     theme: {
@@ -41,7 +43,6 @@
     maxMessages: parseInt(ds('max-messages', '200'), 10) || 200
   };
 
-  // --- safety: if no webhook configured, we will display an info message but still show widget ---
   const hasWebhook = !!cfg.webhookUrl;
 
   // --- create styles (namespaced) ---
@@ -87,6 +88,7 @@
       padding: 14px; overflow-y: auto; display:flex; flex-direction:column; gap:10px;
       background: ${cfg.theme.chatBg};
     }
+
     .aiw-msg { max-width: 84%; padding:10px 12px; border-radius:12px; font-size:14px; line-height:1.35; display:flex; gap:8px; align-items:flex-end; }
     .aiw-msg.aiw-user { margin-left:auto; background: ${cfg.theme.userBubble}; color:#fff; align-self:flex-end; }
     .aiw-msg.aiw-bot { margin-right:auto; background: ${cfg.theme.botBubble}; color:#fff; align-self:flex-start; }
@@ -139,7 +141,6 @@
           <input id="aiw-chat-input" type="text" placeholder="Type your message..." aria-label="Type message">
           <button id="aiw-send-btn" aria-label="Send message">Send</button>
         </div>
-        ${cfg.footerText ? `<div id="aiw-footer-text">${escapeHtml(cfg.footerText)}</div>` : ''}
       </div>
     </div>
   `;
@@ -152,13 +153,14 @@
   const bodyEl = document.getElementById('aiw-chat-body');
   const inputEl = document.getElementById('aiw-chat-input');
   const sendBtn = document.getElementById('aiw-send-btn');
+  const footerContainer = box.querySelector('#aiw-chat-footer');
 
   // --- open/close handlers ---
-  btn.addEventListener('click', () => { box.style.display = 'flex'; btn.style.display = 'none'; box.setAttribute('aria-hidden','false'); inputEl.focus(); });
-  closeBtn.addEventListener('click', () => { box.style.display = 'none'; btn.style.display = 'flex'; box.setAttribute('aria-hidden','true'); });
+  btn.addEventListener('click', () => { box.style.display = 'flex'; btn.style.display = 'none'; box.setAttribute('aria-hidden', 'false'); inputEl.focus(); });
+  closeBtn.addEventListener('click', () => { box.style.display = 'none'; btn.style.display = 'flex'; box.setAttribute('aria-hidden', 'true'); });
 
   // --- small utilities ---
-  function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+  function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
   function el(tag, className) { const e = document.createElement(tag); if (className) e.className = className; return e; }
   function scrollToBottom() { bodyEl.scrollTop = bodyEl.scrollHeight; }
 
@@ -173,7 +175,6 @@
 
   // --- add message to UI ---
   function addMessage(text, who, options = {}) {
-    // who: 'user' or 'bot'
     const m = el('div', `aiw-msg aiw-${who}`);
     if (who === 'bot' && cfg.assistantAvatar) {
       const img = el('img', 'aiw-avatar-msg'); img.src = cfg.assistantAvatar; img.alt = 'A';
@@ -187,7 +188,7 @@
     return m;
   }
 
-  // --- add bot typing indicator (returns element) ---
+  // --- add bot typing indicator ---
   function addTyping() {
     if (!cfg.enableTyping) return null;
     const m = el('div', 'aiw-msg aiw-bot');
@@ -208,10 +209,8 @@
       btn.type = 'button';
       btn.textContent = choiceText;
       btn.addEventListener('click', () => {
-        // show as user message and send
         addMessage(choiceText, 'user');
         sendToWebhook(choiceText);
-        // remove choice buttons to avoid duplicate click
         cwrap.remove();
       });
       cwrap.appendChild(btn);
@@ -223,34 +222,25 @@
   // --- fetch wrapper to send messages to webhook ---
   function sendToWebhook(message) {
     if (!hasWebhook) {
-      // show info if no webhook configured
       addMessage("No webhook configured for this widget. Please set data-webhook on the script.", 'bot');
-      return Promise.resolve({reply: "No webhook", choices: []});
+      return Promise.resolve({ reply: "No webhook", choices: [] });
     }
-
-    // you may wish to adjust payload format expected by your n8n
     const payload = { message: message, timestamp: Date.now() };
-
-    // include session id
     try {
       let sid = sessionStorage.getItem('aiw_chat_sid');
-      if (!sid) { sid = 'sid_' + Math.random().toString(36).slice(2,10); sessionStorage.setItem('aiw_chat_sid', sid); }
+      if (!sid) { sid = 'sid_' + Math.random().toString(36).slice(2, 10); sessionStorage.setItem('aiw_chat_sid', sid); }
       payload.chatId = sid;
-    } catch (e) { /*ignore*/ }
-
+    } catch (e) { }
     return fetch(cfg.webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-    .then(r => {
-      if (!r.ok) throw new Error('Network response not ok');
-      return r.json().catch(() => ({}));
-    })
-    .catch(err => ({ error: true, message: err.message }));
+      .then(r => { if (!r.ok) throw new Error('Network response not ok'); return r.json().catch(() => ({})); })
+      .catch(err => ({ error: true, message: err.message }));
   }
 
-  // --- handle send (from input or from enter) ---
+  // --- handle send (input / enter) ---
   function handleSendText() {
     const text = inputEl.value.trim();
     if (!text) return;
@@ -261,59 +251,55 @@
     const typingEl = addTyping();
     sendToWebhook(text).then(resp => {
       if (typingEl) typingEl.remove();
-      if (!resp) {
-        addMessage("No response from server.", 'bot');
-        return;
-      }
-      if (resp.error) {
-        addMessage("Error: " + (resp.message || 'Request failed'), 'bot');
-        return;
-      }
-      // expected response format: { reply: "text", choices: ["a","b"] }
+      if (!resp) { addMessage("No response from server.", 'bot'); return; }
+      if (resp.error) { addMessage("Error: " + (resp.message || 'Request failed'), 'bot'); return; }
       const reply = (resp.reply || resp.message || resp.output || '');
       if (reply) {
         const botMsg = addMessage(reply, 'bot');
-        // if choices exist, render
-        if (Array.isArray(resp.choices) && resp.choices.length) {
-          renderChoices(botMsg, resp.choices);
-        } else if (Array.isArray(resp.buttons) && resp.buttons.length) {
-          renderChoices(botMsg, resp.buttons); // alternative key
-        }
-      } else {
-        addMessage("No reply provided by webhook.", 'bot');
-      }
+        if (Array.isArray(resp.choices) && resp.choices.length) renderChoices(botMsg, resp.choices);
+        else if (Array.isArray(resp.buttons) && resp.buttons.length) renderChoices(botMsg, resp.buttons);
+      } else { addMessage("No reply provided by webhook.", 'bot'); }
     });
   }
 
-  // --- wire UI events ---
   sendBtn.addEventListener('click', handleSendText);
   inputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') handleSendText(); });
 
-  // --- initial welcome if provided by webhook? Optionally you can trigger a welcome call ---
+  // --- initial welcome ---
   (function maybeWelcome() {
     const autoWelcome = ds('auto-welcome', 'false') === 'true';
     if (autoWelcome && hasWebhook) {
-      // call webhook with a special "open" event (backend can detect and send initial welcome)
       const payload = { event: 'session_start', timestamp: Date.now(), chatId: (sessionStorage.getItem('aiw_chat_sid') || '') };
-      fetch(cfg.webhookUrl, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-      })
-      .then(r => r.json().catch(()=>({})))
-      .then(resp => {
-        if (!resp) return;
-        if (resp.reply) {
-          const botMsg = addMessage(resp.reply, 'bot');
-          if (Array.isArray(resp.choices)) renderChoices(botMsg, resp.choices);
-        }
-      })
-      .catch(()=>{/*ignore*/});
+      fetch(cfg.webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(r => r.json().catch(() => ({})))
+        .then(resp => {
+          if (!resp) return;
+          if (resp.reply) { const botMsg = addMessage(resp.reply, 'bot'); if (Array.isArray(resp.choices)) renderChoices(botMsg, resp.choices); }
+        })
+        .catch(() => { });
     }
   })();
 
-  // --- if webhook is absent, show small notice in footer if footer empty ---
-  if (!hasWebhook && !cfg.footerText) {
-    const f = document.getElementById('aiw-footer-text');
-    if (f) f.textContent = 'No webhook configured';
-  }
+  // --- render footer branding dynamically ---
+  (function renderFooterBranding() {
+    // hide footer if branding=false
+    if (cfg.branding === 'false') return;
+
+    // determine what text to show
+    let footerTextToShow = (cfg.footerText && cfg.footerText.trim()) ? cfg.footerText.trim() : 'Powered by Aioraa';
+
+    const footerEl = document.createElement('div');
+    footerEl.id = 'aiw-footer-text';
+
+    // if default branding, make it clickable
+    if (footerTextToShow === 'Powered by Aioraa') {
+      footerEl.innerHTML = `<a href="https://www.aioraa.com" target="_blank" rel="noopener noreferrer" style="color:${cfg.footerTextColor}; text-decoration:none;">Powered by Aioraa</a>`;
+    } else {
+      footerEl.textContent = footerTextToShow;
+      footerEl.style.color = cfg.footerTextColor || 'inherit';
+    }
+
+    footerContainer.appendChild(footerEl);
+  })();
 
 })();
