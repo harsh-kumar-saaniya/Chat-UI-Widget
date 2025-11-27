@@ -159,3 +159,60 @@ Example response:
 * **Colors not applied**: Ensure color attributes are valid hex codes.
 
 ---
+
+
+NEW UPDATED CHAT WIDGET DETAILS: 
+
+1. Core & Functional Attributes
+Attribute	Default	Purpose / Usage
+data-webhook	''	URL of your webhook (server/API) where chat messages are sent. Required for real conversations. If empty, widget shows “No webhook configured”.
+data-assistant-name	'Chat'	The name of your AI assistant shown in the header.
+data-assistant-avatar	''	URL of assistant avatar image. Displays next to assistant name in header and bot messages.
+data-enable-typing	'true'	Show or hide bot typing animation. 'true' enables it, 'false' disables.
+2. Footer & Branding Attributes
+Attribute	Default	Purpose / Usage
+data-footer-text	''	Custom text for the footer. Example: data-footer-text="Powered by Starbucks". Overrides default “Powered by Aioraa”.
+data-footer-text-color	'#ffffff'	Custom color for footer text (default is white). Works for both default and custom branding.
+data-branding	'true'	Enable/disable footer branding completely. 'false' hides the footer entirely. 'true' shows default/custom branding.
+3. Theme / Color Attributes
+Attribute	Default	Purpose / Usage
+data-chat-button	'#6f5cff'	Color of the floating chat button.
+data-chat-header	'#6f5cff'	Background color of chat header.
+data-user-bubble	'#33334d'	Color of user chat bubbles.
+data-bot-bubble	'#6f5cff'	Color of bot chat bubbles.
+data-footer-bg	'#1e1e2f'	Background color of the chat footer.
+data-chat-bg	'#1b1b2a'	Background color of the chat body.
+data-input-bg	'#2a2a3f'	Background color of input field.
+data-input-color	'#ffffff'	Text color inside input field.
+data-send-button	'#6f5cff'	Color of send button.
+data-send-hover	'#5648d4'	Color of send button when hovered.
+data-choice-bg	'#5c4dff'	Background color of choice buttons.
+data-choice-color	'#ffffff'	Text color of choice buttons.
+data-choice-hover	'#4a3dcf'	Choice button hover color.
+4. Behavior / Message Attributes
+Attribute	Default	Purpose / Usage
+data-max-messages	200	Max number of messages to keep in the chat body. Older messages are removed if exceeded.
+data-auto-welcome	'false'	Automatically trigger a welcome message from webhook on widget open. 'true' enables it.
+✅ Usage Notes
+
+Footer & Branding Logic
+
+Default: shows Powered by Aioraa with clickable link.
+
+Custom branding: use data-footer-text="YourBrand" and optionally data-footer-text-color.
+
+Hide branding: data-branding="false" hides footer completely.
+
+Themes
+
+All color attributes are optional. If not passed, widget uses default colors defined in script.
+
+You can change button, chat bubbles, footer, input, and choice colors independently.
+
+Behavior
+
+Typing indicator: controlled by data-enable-typing.
+
+Max messages: prevents DOM overload for long chat sessions.
+
+Auto welcome: useful if you want the bot to greet the user when chat opens.
